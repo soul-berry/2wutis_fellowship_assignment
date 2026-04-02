@@ -1,0 +1,9 @@
+pandas
+numpy
+matplotlib
+jupyter
+pytest
+pyyaml
+python-dotenv
+alpaca-py
+vectorbt
