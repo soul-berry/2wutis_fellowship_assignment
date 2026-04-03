@@ -7,3 +7,5 @@ pyyaml
 python-dotenv
 alpaca-py
 vectorbt
+six==1.16.0
+python-dateutil>=2.8.2

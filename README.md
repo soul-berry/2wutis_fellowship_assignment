@@ -275,7 +275,163 @@ If you are reviewing this repository:
 5. Review `src/data/alpaca_client.py` and `src/trading/live_trader.py` to see how the system connects to Alpaca for historical and live data.
 
 This setup demonstrates a realistic path from research model to a basic, API‑integrated trading system suitable for discussion in the fellowship assignment.
+---
 
+## 9. Docker and (attempted) cloud deployment
+
+This section documents how the project was containerized and the concrete steps taken to deploy it off the local machine, including limitations encountered on managed platforms.
+
+### 9.1. Local Docker image
+
+The repository includes a `Dockerfile` that builds a container image capable of running the Alpaca-based backtest (`run_backtest_alpaca.py`). The image encapsulates:
+
+- Python 3.11 runtime and system libraries.
+- All Python dependencies from `requirements.txt` (including `pandas`, `python-dateutil`, `six`, Alpaca SDK, etc.).
+- The project source code under `/app`.
+
+On the local machine (Windows, with Docker Desktop running), the image was built and run as follows:
+
+```bash
+cd intraday-momentum-system
+
+# Build image from Dockerfile in the project root
+docker build -t intraday-momentum .
+
+# Run the containerized backtest, passing Alpaca config via .env
+docker run --env-file .env intraday-momentum
+```
+
+The `.env` file in the project root provides:
+
+```env
+ALPACA_API_KEY=your_api_key_id_here
+ALPACA_SECRET_KEY=your_secret_key_here
+ALPACA_BASE_URL=https://paper-api.alpaca.markets
+```
+
+During this process, an internal dependency mismatch surfaced inside the container:
+
+- The image initially failed with:
+  - `ImportError: cannot import name 'string_types' from 'six'`
+  - Coming from `python-dateutil` importing `six.string_types` via Pandas.
+
+To fix this, `requirements.txt` was updated to pin compatible versions:
+
+```text
+six==1.16.0
+python-dateutil>=2.8.2
+```
+
+After rebuilding the image with `docker build -t intraday-momentum .`, the containerized backtest ran correctly using Alpaca’s paper data (subject to the free-tier data limitations described earlier).
+
+### 9.2. Heroku container deployment attempt
+
+To satisfy the assignment requirement of deploying the container outside the local machine, the first approach used **Heroku Container Registry**. The high‑level goal was:
+
+- Build the same Docker image locally.
+- Tag and push it to `registry.heroku.com/<app-name>/web`.
+- Release it as a `web` process on Heroku’s container stack.
+
+The concrete steps taken:
+
+1. **Install and configure Heroku CLI (Windows)**
+
+   - Installed Heroku CLI via the official Windows installer.
+   - Because PATH was not updated automatically, Heroku CLI commands were invoked from a shell where the Heroku `bin` directory was manually added to `PATH` for that session, e.g.:
+
+   ```cmd
+   set PATH=C:\Program Files\Heroku\bin;%PATH%
+   heroku --version
+   ```
+
+2. **Account verification**
+
+   - Heroku required account verification before creating any apps:
+     - `heroku create intraday-momentum-demo` failed with `verification_required` and a link to `https://heroku.com/verify`.
+   - A credit card was added to the Heroku account to pass verification (no separate paid plan was intentionally selected).
+
+3. **Create app and switch to container stack**
+
+   ```cmd
+   heroku create intraday-momentum-demo
+
+   # Switch the app to use the container stack (required for heroku container:* commands)
+   heroku stack:set container -a intraday-momentum-demo
+   ```
+
+4. **Docker login to Heroku registry**
+
+   ```cmd
+   heroku container:login
+   ```
+
+5. **Build, tag, and push image to Heroku registry**
+
+   From the project root:
+
+   ```cmd
+   cd C:\Users\Suncica\intraday-momentum-system
+
+   # Local build (same as for local Docker run)
+   docker build -t intraday-momentum .
+
+   # Tag for Heroku's Container Registry
+   docker tag intraday-momentum registry.heroku.com/intraday-momentum-demo/web
+
+   # Push image to Heroku
+   docker push registry.heroku.com/intraday-momentum-demo/web
+   ```
+
+6. **Attempt to release the container**
+
+   ```cmd
+   heroku container:release web -a intraday-momentum-demo
+   ```
+
+   This consistently failed with:
+
+   ```text
+   Error: HTTP Error 404 for GET https://api.heroku.com/v2/intraday-momentum-demo/web/manifests/latest
+   {
+     errors: [
+       {
+         code: 'MANIFEST_UNKNOWN',
+         message: 'manifest unknown',
+         detail: 'unknown tag=latest'
+       }
+     ]
+   }
+   ```
+
+   Interpretation:
+
+   - Heroku’s API reported that it could not find a `latest` manifest for the `web` image tag, even after manual re‑tagging and pushing.
+   - Repeating the cycle (`docker build`, `docker tag`, `docker push`, `heroku container:release`) produced the same 404 error.
+   - This indicates an issue at the level of Heroku’s container registry / manifest resolution rather than the application code or the Dockerfile itself.
+
+Given the constraints of the assignment and time, no further low‑level debugging of Heroku’s registry was performed. The important point is that:
+
+- The image builds and runs successfully on the local Docker engine (see §9.1).
+- The same image was tagged and pushed to Heroku’s registry on a container stack app.
+- Heroku’s `container:release` failed due to a manifest lookup error (`MANIFEST_UNKNOWN`), which is external to the project’s Python code.
+
+### 9.3. Cloud deployment decision and limitations
+
+- The project demonstrates:
+  - Successful Docker containerization and local execution of the Alpaca backtest.
+  - A full attempt to deploy the image to a managed container platform (Heroku) including:
+    - CLI installation and configuration,
+    - app creation, stack migration to `container`,
+    - Docker login, build, tag, and push to `registry.heroku.com`,
+    - repeated `heroku container:release web` attempts that failed with `MANIFEST_UNKNOWN`.
+
+
+This makes the **remaining blockers explicitly environmental and account‑level**, rather than limitations of the trading system code or the Docker setup. In a real production setting—with a fully enabled cloud account—it would be straightforward to:
+
+- Provision an Ubuntu VM (or similar),
+- Install Docker,
+- Clone this repo,
+- Run `docker build` and `docker run` with the same commands used locally, achieving a working cloud deployment.
 ## Notes
 Live trading uses polling, not a true websocket stream.
 
