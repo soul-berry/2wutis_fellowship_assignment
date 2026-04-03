@@ -275,3 +275,8 @@ If you are reviewing this repository:
 5. Review `src/data/alpaca_client.py` and `src/trading/live_trader.py` to see how the system connects to Alpaca for historical and live data.
 
 This setup demonstrates a realistic path from research model to a basic, API‑integrated trading system suitable for discussion in the fellowship assignment.
+
+## Notes
+Live trading uses polling, not a true websocket stream.
+
+Order submission in LiveTrader should be used only in paper mode and is intentionally simple (no advanced risk management or error handling).

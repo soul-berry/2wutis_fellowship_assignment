@@ -9,6 +9,8 @@ from alpaca.data.timeframe import TimeFrame
 from alpaca.trading.client import TradingClient
 from alpaca.trading.requests import MarketOrderRequest
 from alpaca.trading.enums import OrderSide, TimeInForce
+from alpaca.data.enums import DataFeed
+
 
 load_dotenv()
 
@@ -47,6 +49,7 @@ class AlpacaClient:
             timeframe=timeframe,
             start=start,
             end=end,
+            feed=DataFeed.IEX,
         )
         bars = self.data_client.get_stock_bars(req).df.reset_index()
         # Standardize columns to what your pipeline expects

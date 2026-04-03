@@ -13,7 +13,7 @@ def main():
     trader = LiveTrader(
         symbol="SPY",
         strategy=strategy,
-        poll_interval_seconds=60,  # one minute
+        poll_interval_seconds=60,
     )
 
     trader.run()
